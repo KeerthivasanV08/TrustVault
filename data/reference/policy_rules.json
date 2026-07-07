@@ -1,0 +1,32 @@
+{
+  "upi": {
+    "daily_limit_standard": 100000,
+    "daily_limit_special": 500000,
+    "new_user_24h_limit": 5000,
+    "requires_2fa": true
+  },
+  "cash": {
+    "pan_required_above": 50000,
+    "ctr_monthly_threshold": 1000000,
+    "sft_savings_yearly": 1000000,
+    "sft_current_yearly": 5000000,
+    "cash_receipt_269st": 200000
+  },
+  "withdrawal": {
+    "tds_non_itr_20l": 2000000,
+    "tds_non_itr_1cr": 10000000,
+    "tds_itr_1cr": 10000000,
+    "report_savings_yearly": 1000000,
+    "report_current_yearly": 5000000
+  },
+  "cross_border": {
+    "report_above": 500000
+  },
+  "bsbd": {
+    "max_monthly_withdrawals": 4
+  },
+  "controls": {
+    "high_risk_countries": ["IRN", "PRK", "SYR"],
+    "blocked_entities": ["SANCTIONED_ENTITY", "BLACKLISTED_BENEFICIARY"]
+  }
+}
