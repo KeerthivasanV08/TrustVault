@@ -64,6 +64,6 @@ lerna-debug.log*
 new_version/
 
 # Large generated files
-backend/data/processed/alerts.csv
-backend/data/processed/explainability_log.csv
-backend/data/processed/reports.csv
+data/processed/alerts.csv
+data/processed/explainability_log.csv
+data/processed/reports.csv
