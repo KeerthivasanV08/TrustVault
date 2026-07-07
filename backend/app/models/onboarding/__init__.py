@@ -1,0 +1,1 @@
+"""Onboarding model artifacts package."""

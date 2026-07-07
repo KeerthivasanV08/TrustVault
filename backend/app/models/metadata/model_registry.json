@@ -1,0 +1,19 @@
+{
+  "transaction_sequence": {
+    "active_model": "models/transaction/lstm_sequence_model.h5",
+    "format": "h5",
+    "status": "active"
+  }
+}
+{
+  "onboarding_model": {
+    "name": "LightGBM",
+    "version": "v1.0",
+    "status": "active"
+  },
+  "behavioral_model": {
+    "name": "LightGBM",
+    "version": "v1.0",
+    "status": "active"
+  }
+}

@@ -1,0 +1,69 @@
+# Environment and secrets
+.env
+.env.*
+.venv
+venv
+env
+**/.venv/
+**/venv/
+**/env/
+
+# Python artifacts
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+*.egg-info/
+.Python
+pip-wheel-metadata/
+
+# Node artifacts
+node_modules/
+dist/
+dist-ssr/
+coverage/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Serialized and model artifacts
+*.pkl
+*.pickle
+*.joblib
+*.h5
+*.pt
+*.pth
+
+# OS and editor files
+.DS_Store
+*.sw?
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Local overrides
+
+*.local
+new_version/
+
+# Large generated files
+backend/data/processed/alerts.csv
+backend/data/processed/explainability_log.csv
+backend/data/processed/reports.csv

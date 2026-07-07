@@ -1,0 +1,11 @@
+{
+  "onboarding": {
+    "block_threshold": 0.85,
+    "review_threshold": 0.60
+  },
+  "transaction": {
+    "auto_block": 0.92,
+    "officer_review": 0.70,
+    "soft_nudge": 0.50
+  }
+}
