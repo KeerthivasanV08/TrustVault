@@ -3,6 +3,8 @@ import pandas as pd
 from pathlib import Path
 from datetime import datetime
 
+from app.core import storage_paths
+
 BASE_DIR = Path(__file__).resolve().parents[2]
 PROCESSED_DIR = BASE_DIR / "data" / "processed"
 
@@ -10,7 +12,7 @@ def generate_alerts():
     print("🚀 Generating Operational Alert Queue...")
 
     # 1. Load Decisions and Labels
-    onboarding = pd.read_csv(PROCESSED_DIR / "onboarding_results.csv")
+    onboarding = pd.read_csv(storage_paths.ONBOARDING_RISK_SNAPSHOT_PATH)
     labels = pd.read_csv(PROCESSED_DIR / "labels.csv")
 
     # 2. Merge ML results with confirmed archetype labels

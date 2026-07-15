@@ -26,12 +26,7 @@ RAW_PATH = (
     / "users.csv"
 )
 
-OUT_PATH = (
-    AML_DIR
-    / "data"
-    / "processed"
-    / "graph_features.csv"
-)
+OUT_PATH = AML_DIR / "data" / "processed" / "training" / "graph_features.csv"
 
 
 def build_graph_features():
@@ -163,7 +158,7 @@ def build_graph_features():
         index=False
     )
 
-    print("\n✅ graph_features.csv created")
+    print("\n✅ training/graph_features.csv created")
     print(f"📍 Saved at: {OUT_PATH}")
     print(
         f"📈 Rows: {len(graph_df)} | "

@@ -15,7 +15,7 @@ service = OnboardingService()
 explain_service = OnboardingExplainabilityService()
 
 
-ONBOARDING_RESULTS_FILE = storage_paths.AUDIT_DIR / "onboarding_results.csv"
+ONBOARDING_RESULTS_FILE = storage_paths.ONBOARDING_DECISIONS_AUDIT_PATH
 
 
 @router.post("/onboarding")

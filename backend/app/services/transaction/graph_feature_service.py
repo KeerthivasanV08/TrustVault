@@ -142,6 +142,8 @@ class GraphFeatureService:
 
     def _empty_graph(self, reason: str, selected_account: Optional[str] = None) -> Dict[str, Any]:
         return {
+            "graph_available": False,
+            "graph_status": "UNAVAILABLE",
             "nodes": [],
             "edges": [],
             "circularFlows": [],
@@ -187,6 +189,8 @@ class GraphFeatureService:
         ]
 
         return {
+            "graph_available": True,
+            "graph_status": "AVAILABLE" if self.neo4j.is_available() else "UNAVAILABLE",
             "nodes": laid_out_nodes,
             "edges": edges,
             "circularFlows": circular_flows,
@@ -219,6 +223,8 @@ class GraphFeatureService:
             edges.append({"source": account_id, "target": neighbor_id, "amount": 1, "suspicious": node.get("risk", 0) >= 70})
 
         return {
+            "graph_available": True,
+            "graph_status": "AVAILABLE" if self.neo4j.is_available() else "UNAVAILABLE",
             "nodes": list(nodes.values()),
             "edges": edges,
             "circularFlows": [

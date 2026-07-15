@@ -16,7 +16,7 @@ async def network(limit: int = Query(75, ge=1, le=500)):
 @router.get("/account/{account_id}")
 async def account_network(account_id: str, depth: int = Query(2, ge=1, le=4)):
     result = graph_service.get_account_graph(account_id, depth=depth)
-    if not result.get("nodes"):
+    if not result.get("nodes") and result.get("graph_status") != "UNAVAILABLE":
         raise HTTPException(status_code=404, detail="Account graph not found")
     return result
 

@@ -5,6 +5,7 @@ from typing import Any, Mapping
 
 import pandas as pd
 
+from app.core.runtime_context import get_runtime_session_id
 from app.services.transaction.control_service import RegulatoryControlEngine
 from app.services.transaction.ml_behavior_service import MLBehaviorService
 from app.services.transaction.sequence_model_service import SequenceModelService
@@ -16,6 +17,8 @@ from app.services.shared.reporting_service import reporting_service
 from app.services.transaction.audit_service import AuditService
 from app.services.transaction.whitelist_service import WhitelistService
 from app.services.transaction.context_service import ContextService
+from app.services.transaction.velocity_service import VelocityService
+from app.realtime.transaction_memory_store import append_transaction
 from app.services.alerts.transaction_alert_service import create_transaction_alert
 
 """Manual/API transaction analysis pipeline.
@@ -40,6 +43,25 @@ class TransactionOrchestrator:
         self.audit = AuditService()
         self.whitelist = WhitelistService()
         self.context = ContextService()
+        self.velocity = VelocityService()
+
+    def _record_runtime_transaction(self, txn: Mapping[str, Any], decision_result: Mapping[str, Any], control_result: Mapping[str, Any], ml_result: Mapping[str, Any], sequence_result: Mapping[str, Any], graph_result: Mapping[str, Any]) -> None:
+        runtime_record = {
+            **dict(txn),
+            "runtime_session_id": get_runtime_session_id(),
+            "decision": decision_result.get("decision", decision_result.get("immediate_action", "UNKNOWN")),
+            "final_score": decision_result.get("final_score", 0),
+            "behavior_score": decision_result.get("behavior_score", ml_result.get("behavior_score", 0)),
+            "sequence_score": decision_result.get("sequence_score", sequence_result.get("sequence_score", 0)),
+            "graph_score": decision_result.get("graph_score", graph_result.get("graph_score", 0)),
+            "rule_score": decision_result.get("rule_score", 0),
+            "control_reason": control_result.get("reason", control_result.get("decision", "")),
+        }
+        if not runtime_record.get("trans_id") and runtime_record.get("transaction_id"):
+            runtime_record["trans_id"] = runtime_record["transaction_id"]
+
+        self.velocity.update_after_transaction(dict(txn))
+        append_transaction(runtime_record)
 
     async def process_transaction(self, txn: Mapping[str, Any]):
         sender_id = str(txn.get("sender_id", ""))
@@ -65,6 +87,14 @@ class TransactionOrchestrator:
                 "reason": control_result.get("reason", "BLOCKED_BY_CONTROL_ENGINE"),
                 "reasons": [control_result.get("reason", "BLOCKED_BY_CONTROL_ENGINE")],
             }
+            self._record_runtime_transaction(
+                txn=txn,
+                decision_result=hard_decision,
+                control_result=control_result,
+                ml_result={},
+                sequence_result={"sequence_score": 0.0, "sequence_pattern": "INSUFFICIENT_HISTORY"},
+                graph_result={"neo4j_graph_score": 0.0, "graph_score": 0.0, "known_fraud_neighbors": 0, "community_risk": "LOW", "reasons": []},
+            )
             reports = reporting_service.generate_transaction_reports(
                 txn=txn,
                 decision_result=hard_decision,
@@ -154,11 +184,21 @@ class TransactionOrchestrator:
             except Exception:
                 pass
 
+        self._record_runtime_transaction(
+            txn=txn,
+            decision_result=final_decision,
+            control_result=control_result,
+            ml_result=ml_result,
+            sequence_result=sequence_result,
+            graph_result=graph_result,
+        )
+
         try:
             await asyncio.to_thread(
                 self.graph_store.record_transaction,
                 {
                     **dict(txn),
+                    "runtime_session_id": get_runtime_session_id(),
                     "behavior_score": final_decision.get("behavior_score", 0),
                     "sequence_score": final_decision.get("sequence_score", 0),
                     "graph_score": final_decision.get("graph_score", 0),

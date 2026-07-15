@@ -3,10 +3,17 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
+from app.core.runtime_context import initialize_runtime_session
+from app.core.policy_engine import get_policy_engine
 
 # Ensure storage directories exist before importing services that may write files
 from app.core.storage_paths import initialize_storage_directories
 initialize_storage_directories()
+runtime_session = initialize_runtime_session()
+policy_engine = get_policy_engine()
+
+from app.realtime.transaction_memory_store import initialize_runtime_store
+initialize_runtime_store()
 
 from app.services.transaction.audit_service import initialize_transaction_audit_storage
 initialize_transaction_audit_storage()
@@ -21,9 +28,12 @@ from app.api.v1.reports import router as reports_router
 from app.core.model_loader import initialize_model_runtime, get_model_loader
 
 # Realtime engine
-from app.realtime.realtime_engine import start_realtime_engine
+from app.realtime.realtime_engine import start_realtime_engine_once
 from app.realtime.transaction_streamer import router as realtime_router
 from app.api.accounts_routes import router as accounts_router
+
+# SLA monitoring
+from app.services.officer.sla_breach_monitor import sla_breach_monitor
 
 
 @asynccontextmanager
@@ -34,6 +44,9 @@ async def lifespan(app: FastAPI):
     startup_health = initialize_model_runtime()
     app.state.model_health = startup_health
     app.state.runtime_mode = startup_health.get("runtime_mode", "DEGRADED")
+    app.state.runtime_session_id = runtime_session.runtime_session_id
+    app.state.started_at = runtime_session.started_at
+    app.state.policy_version = policy_engine.get_policy_version()
 
     print("✅ Behavioral Model Loaded" if startup_health.get("behavioral_model") == "healthy" else f"❌ Behavioral Model Failed: {startup_health.get('artifacts', {}).get('behavioral_model', {}).get('reason', 'unknown')}")
     print("✅ Sequence Model Loaded" if startup_health.get("sequence_model") == "healthy" else f"❌ Sequence Model Failed: {startup_health.get('artifacts', {}).get('sequence_model', {}).get('reason', 'unknown')}")
@@ -41,19 +54,32 @@ async def lifespan(app: FastAPI):
     print(f"✅ Runtime Mode: {startup_health.get('runtime_mode', 'DEGRADED')}")
 
     print("✅ AML Services Initialized")
+    print(f"✅ Runtime Session: {runtime_session.runtime_session_id}")
+    print(f"✅ Policy Version: {app.state.policy_version}")
     print("✅ API Ready\n")
     # start realtime engine in background
     try:
-        import asyncio
-
-        asyncio.create_task(start_realtime_engine())
+        start_realtime_engine_once()
         print("✅ Realtime engine started")
     except Exception:
         print("⚠️ Failed to start realtime engine")
 
+    # Start SLA monitoring
+    try:
+        sla_breach_monitor.start_monitoring()
+        print("✅ SLA monitoring started")
+    except Exception as e:
+        print(f"⚠️ Failed to start SLA monitoring: {e}")
+
     yield
 
     print("\n🛑 TrustVault AML Platform Shutdown")
+    
+    # Stop SLA monitoring
+    try:
+        sla_breach_monitor.stop_monitoring()
+    except Exception:
+        pass
 
 
 app = FastAPI(

@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from schemas.transaction_schema import TransactionRequest
 from app.services.transaction.transaction_service import TransactionService
-from app.realtime.transaction_memory_store import LIVE_TRANSACTIONS
+from app.realtime.transaction_memory_store import get_recent_transactions
 
 router = APIRouter(tags=["Transactions"])
 
@@ -19,6 +19,6 @@ async def analyze_transaction(request: TransactionRequest):
 
 
 @router.get("/recent")
-async def recent_transactions():
-    # Return a list snapshot of the in-memory recent transactions
-    return list(LIVE_TRANSACTIONS)
+async def recent_transactions(limit: int = 50):
+    # Return the bounded live snapshot first, then the compact runtime fallback.
+    return get_recent_transactions(limit=limit, newest_first=True)

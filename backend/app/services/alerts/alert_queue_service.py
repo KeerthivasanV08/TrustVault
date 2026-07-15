@@ -1,6 +1,7 @@
 from collections import deque
 from typing import Dict, Any, List
 from .alert_storage_service import append_row
+from app.core.runtime_context import get_runtime_session_id
 
 QUEUES: Dict[str, deque] = {
     'P1_QUEUE': deque(),
@@ -16,7 +17,7 @@ def enqueue_alert(queue_name: str, alert: Dict[str, Any]) -> None:
     q.append(alert)
     # persist a snapshot row for officer_queue for traceability
     try:
-        append_row('officer_queue', {'officer_id': alert.get('assigned_officer', ''), 'assigned_count': 1, 'alerts': alert.get('alert_id', ''), 'last_assigned_at': alert.get('created_at', '')})
+        append_row('officer_queue', {'officer_id': alert.get('assigned_officer', ''), 'assigned_count': 1, 'alerts': alert.get('alert_id', ''), 'last_assigned_at': alert.get('created_at', ''), 'runtime_session_id': get_runtime_session_id()})
     except Exception:
         pass
 

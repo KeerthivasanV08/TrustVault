@@ -1,6 +1,7 @@
 from datetime import datetime
 from .sla_service import check_sla_breach
 from .alert_storage_service import append_row
+from app.core.runtime_context import get_runtime_session_id
 
 
 def check_and_escalate(alert: dict) -> dict:
@@ -15,6 +16,7 @@ def check_and_escalate(alert: dict) -> dict:
             'reason': 'SLA_BREACH',
             'escalation_time': datetime.utcnow().isoformat(),
             'attempt': 1,
+            'runtime_session_id': get_runtime_session_id(),
         }
         try:
             append_row('escalation_log', rec)

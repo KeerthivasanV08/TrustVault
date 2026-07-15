@@ -10,6 +10,7 @@ from typing import Any, Mapping, Sequence
 import pandas as pd
 
 from app.core import storage_paths
+from app.core.runtime_context import get_runtime_session_id
 from app.utils.file_utils import ensure_parent_dir
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,7 @@ EXPLAINABILITY_AUDIT_FILE = AUDIT_DIR / "explainability_audit.csv"
 TRANSACTION_AUDIT_COLUMNS = [
     "event_id",
     "timestamp",
+    "runtime_session_id",
     "transaction_id",
     "user_id",
     "decision",
@@ -35,6 +37,7 @@ TRANSACTION_AUDIT_COLUMNS = [
 ML_AUDIT_COLUMNS = [
     "event_id",
     "timestamp",
+    "runtime_session_id",
     "transaction_id",
     "behavior_score",
     "sequence_score",
@@ -43,17 +46,25 @@ ML_AUDIT_COLUMNS = [
 ]
 
 OFFICER_AUDIT_COLUMNS = [
+    "audit_id",
     "event_id",
     "timestamp",
+    "runtime_session_id",
     "officer_id",
     "action",
+    "alert_id",
     "case_id",
+    "old_state",
+    "new_state",
+    "reason",
     "notes",
+    "metadata",
 ]
 
 EXPLAINABILITY_AUDIT_COLUMNS = [
     "event_id",
     "timestamp",
+    "runtime_session_id",
     "transaction_id",
     "user_id",
     "category",
@@ -88,12 +99,35 @@ def _seed_csv(path: Path, columns: Sequence[str]) -> None:
         pd.DataFrame(columns=list(columns)).to_csv(path, index=False)
 
 
+def _migrate_csv(path: Path, columns: Sequence[str]) -> None:
+    ensure_parent_dir(path)
+    if not path.exists():
+        pd.DataFrame(columns=list(columns)).to_csv(path, index=False)
+        return
+
+    try:
+        frame = pd.read_csv(path)
+    except Exception:
+        pd.DataFrame(columns=list(columns)).to_csv(path, index=False)
+        return
+
+    changed = False
+    for column in columns:
+        if column not in frame.columns:
+            frame[column] = ""
+            changed = True
+
+    if changed or list(frame.columns) != list(columns):
+        frame = frame.reindex(columns=list(columns), fill_value="")
+        frame.to_csv(path, index=False)
+
+
 def initialize_transaction_audit_storage() -> None:
     storage_paths.initialize_storage_directories()
     _ensure_audit_dir()
     _seed_csv(TRANSACTION_AUDIT_FILE, TRANSACTION_AUDIT_COLUMNS)
     _seed_csv(ML_AUDIT_FILE, ML_AUDIT_COLUMNS)
-    _seed_csv(OFFICER_AUDIT_FILE, OFFICER_AUDIT_COLUMNS)
+    _migrate_csv(OFFICER_AUDIT_FILE, OFFICER_AUDIT_COLUMNS)
     _seed_csv(EXPLAINABILITY_AUDIT_FILE, EXPLAINABILITY_AUDIT_COLUMNS)
 
 
@@ -120,6 +154,7 @@ def log_transaction_decision(
     row = {
         "event_id": str(uuid.uuid4()),
         "timestamp": timestamp or _now(),
+        "runtime_session_id": get_runtime_session_id(),
         "transaction_id": transaction_id,
         "user_id": user_id,
         "decision": decision,
@@ -173,6 +208,7 @@ def log_ml_scores(
     row = {
         "event_id": str(uuid.uuid4()),
         "timestamp": timestamp or _now(),
+        "runtime_session_id": get_runtime_session_id(),
         "transaction_id": transaction_id,
         "behavior_score": behavior_score,
         "sequence_score": sequence_score,
@@ -186,16 +222,29 @@ def log_officer_action(
     officer_id: str,
     action: str,
     case_id: str | None = None,
+    alert_id: str | None = None,
+    old_state: str | None = None,
+    new_state: str | None = None,
+    reason: str | None = None,
     notes: str | None = None,
+    metadata: Any = None,
     timestamp: str | None = None,
 ) -> str:
+    audit_id = str(uuid.uuid4())
     row = {
+        "audit_id": audit_id,
         "event_id": str(uuid.uuid4()),
         "timestamp": timestamp or _now(),
+        "runtime_session_id": get_runtime_session_id(),
         "officer_id": officer_id,
         "action": action,
         "case_id": case_id or "",
+        "alert_id": alert_id or "",
+        "old_state": old_state or "",
+        "new_state": new_state or "",
+        "reason": reason or "",
         "notes": notes or "",
+        "metadata": _stringify(metadata if metadata is not None else {}),
     }
     return _append_row(OFFICER_AUDIT_FILE, row, OFFICER_AUDIT_COLUMNS)
 
@@ -212,6 +261,7 @@ def log_explainability_event(
     row = {
         "event_id": str(uuid.uuid4()),
         "timestamp": timestamp or _now(),
+        "runtime_session_id": get_runtime_session_id(),
         "transaction_id": transaction_id,
         "user_id": user_id or "",
         "category": category,

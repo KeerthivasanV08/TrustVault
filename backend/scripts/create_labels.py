@@ -3,6 +3,8 @@
 import pandas as pd
 from pathlib import Path
 
+from app.core import storage_paths
+
 # ---------------------------------------------------
 # PATH CONFIG
 # ---------------------------------------------------
@@ -37,9 +39,7 @@ def generate_realistic_labels():
             PROCESSED_DIR / "user_features.csv"
         )
 
-        graph_f = pd.read_csv(
-            PROCESSED_DIR / "graph_features.csv"
-        )
+        graph_f = pd.read_csv(storage_paths.TRAINING_GRAPH_FEATURES_PATH)
 
         txn_f = pd.read_csv(
             PROCESSED_DIR / "transaction_features.csv"

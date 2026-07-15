@@ -6,12 +6,7 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parents[4]
 
-ONBOARDING_RESULTS = (
-    BASE_DIR /
-    "data" /
-    "processed" /
-    "onboarding_results.csv"
-)
+ONBOARDING_RESULTS = BASE_DIR / "data" / "processed" / "onboarding" / "account_risk_snapshot.csv"
 
 
 class DeviceIntelligenceService:

@@ -1,4 +1,4 @@
-from app.core import storage_paths
+from app.services.cases.case_repository import case_repository
 
 from .freeze_service import FreezeService
 from .officer_case_service import OfficerCaseService
@@ -14,18 +14,10 @@ class ManualReviewService:
 
     async def resolve_transaction(self, case_id, decision, officer_id, officer_notes=""):
 
-        # fetch case
-        import pandas as pd
-
-        CASE_FILE = storage_paths.CASES_DIR / "officer_cases.csv"
-
-        df = pd.read_csv(CASE_FILE)
-        case = df[df["case_id"] == case_id].to_dict("records")
+        case = case_repository.get_case(case_id)
 
         if not case:
             return {"error": "CASE_NOT_FOUND"}
-
-        case = case[0]
 
         user_id = case["user_id"]
 

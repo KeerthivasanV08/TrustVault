@@ -6,6 +6,7 @@ from .onboarding_explainability_service import OnboardingExplainabilityService
 from .onboarding_audit_service import OnboardingAuditService
 from .onboarding_feature_builder import OnboardingFeatureBuilder
 from app.services.alerts.onboarding_alert_service import create_onboarding_alert
+from app.core.runtime_context import get_runtime_session_id
 
 
 class OnboardingService:
@@ -59,6 +60,7 @@ class OnboardingService:
 
         audit_record = {
             "user_id": request_data.get("user_id"),
+            "runtime_session_id": get_runtime_session_id(),
             "decision": decision_output["decision"],
             "identity_risk": ml_output["identity_risk"],
             "confidence": ml_output["confidence"],
@@ -77,6 +79,7 @@ class OnboardingService:
             try:
                 create_onboarding_alert({
                     "user_id": request_data.get("user_id"),
+                    "runtime_session_id": get_runtime_session_id(),
                     "decision": decision_output["decision"],
                     "final_score": ml_output["identity_risk"] / 100.0,
                     "risk_score": ml_output["identity_risk"],

@@ -23,6 +23,7 @@ from app.realtime.transaction_memory_store import (
     append_graph_event,
     publish_event,
     DASHBOARD_METRICS,
+    USER_TRANSACTION_HISTORY,
 )
 
 from app.services.transaction.ml_behavior_service import MLBehaviorService
@@ -36,8 +37,6 @@ from app.services.alerts.alert_priority_service import evaluate_priority
 from app.services.alerts.transaction_alert_service import create_transaction_alert
 
 logger = logging.getLogger(__name__)
-
-USER_TRANSACTION_HISTORY: Dict[str, list[Dict[str, Any]]] = {}
 
 _behavior_service = MLBehaviorService()
 _sequence_service = SequenceModelService()
@@ -127,7 +126,7 @@ def _seed_sequence_history(sender: str, txn: Dict[str, Any]) -> None:
         "P1": 14,
     }.get(band, 6)
 
-    hist = USER_TRANSACTION_HISTORY.setdefault(sender, [])
+    hist = USER_TRANSACTION_HISTORY[sender]
 
     while len(hist) < target_len - 1:
         clone = dict(txn)
@@ -489,3 +488,17 @@ async def start_realtime_engine():
             logger.exception("Error in realtime engine loop")
 
         await asyncio.sleep(2.5)
+
+
+_REALTIME_ENGINE_TASK: asyncio.Task | None = None
+
+
+def start_realtime_engine_once() -> asyncio.Task:
+    global _REALTIME_ENGINE_TASK
+
+    if _REALTIME_ENGINE_TASK is not None and not _REALTIME_ENGINE_TASK.done():
+        return _REALTIME_ENGINE_TASK
+
+    loop = asyncio.get_running_loop()
+    _REALTIME_ENGINE_TASK = loop.create_task(start_realtime_engine())
+    return _REALTIME_ENGINE_TASK

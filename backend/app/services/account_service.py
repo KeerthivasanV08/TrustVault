@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
+from app.core import storage_paths
 from app.core.storage_paths import DATA_DIR, PROCESSED_DIR
 
 
@@ -71,7 +72,7 @@ def _safe_str(s: Any) -> Optional[str]:
 class AccountService:
     users_csv: Path = DATA_DIR / "raw" / "users.csv"
     features_csv: Path = PROCESSED_DIR / "user_features.csv"
-    onboarding_csv: Path = PROCESSED_DIR / "onboarding_results.csv"
+    onboarding_csv: Path = storage_paths.ONBOARDING_RISK_SNAPSHOT_PATH
 
     def _read_csv(self, path: Path) -> Iterable[Dict[str, Any]]:
         if not path.exists():

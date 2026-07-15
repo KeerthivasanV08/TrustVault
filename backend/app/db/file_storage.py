@@ -9,6 +9,7 @@ from typing import Any, Mapping
 import pandas as pd
 
 from app.core import storage_paths
+from app.core.runtime_context import get_runtime_session_id
 from app.utils.file_utils import ensure_parent_dir
 
 PROCESSED_DIR = storage_paths.PROCESSED_DIR
@@ -20,6 +21,7 @@ EXPLAIN_FILE = PROCESSED_DIR / "explainability_log.csv"
 CONTROL_COLUMNS = [
     "decision_id",
     "timestamp",
+    "runtime_session_id",
     "gate",
     "user_id",
     "transaction_id",
@@ -33,6 +35,7 @@ CONTROL_COLUMNS = [
 REPORT_COLUMNS = [
     "report_id",
     "timestamp",
+    "runtime_session_id",
     "report_type",
     "user_id",
     "transaction_id",
@@ -57,6 +60,7 @@ REPORT_COLUMNS = [
 EXPLAIN_COLUMNS = [
     "event_id",
     "timestamp",
+    "runtime_session_id",
     "report_id",
     "gate",
     "user_id",
@@ -98,6 +102,7 @@ def log_control_decision(record: Mapping[str, Any]) -> None:
     row = {
         "decision_id": record.get("decision_id", str(uuid.uuid4())),
         "timestamp": record.get("timestamp", _now()),
+        "runtime_session_id": record.get("runtime_session_id", get_runtime_session_id()),
         "gate": record.get("gate", "UNKNOWN"),
         "user_id": record.get("user_id", ""),
         "transaction_id": record.get("transaction_id", ""),
@@ -114,6 +119,7 @@ def log_report(record: Mapping[str, Any]) -> None:
     row = {
         "report_id": record.get("report_id", str(uuid.uuid4())),
         "timestamp": record.get("timestamp", _now()),
+        "runtime_session_id": record.get("runtime_session_id", get_runtime_session_id()),
         "report_type": record.get("report_type", "UNKNOWN"),
         "user_id": record.get("user_id", ""),
         "transaction_id": record.get("transaction_id", ""),
@@ -142,6 +148,7 @@ def log_explainability(record: Mapping[str, Any]) -> None:
     row = {
         "event_id": record.get("event_id", str(uuid.uuid4())),
         "timestamp": record.get("timestamp", _now()),
+        "runtime_session_id": record.get("runtime_session_id", get_runtime_session_id()),
         "report_id": record.get("report_id", ""),
         "gate": record.get("gate", "UNKNOWN"),
         "user_id": record.get("user_id", ""),

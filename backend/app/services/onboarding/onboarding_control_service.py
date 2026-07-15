@@ -1,4 +1,10 @@
+from app.core.policy_engine import get_policy_engine
+
+
 class OnboardingControlService:
+
+    def __init__(self):
+        self.policy = get_policy_engine()
 
     def evaluate(self, data: dict):
 
@@ -13,7 +19,8 @@ class OnboardingControlService:
         # HARD BLOCKS
         # ----------------------------------------
 
-        if data.get("sanction_hit", 0):
+        sanction_rule = self.policy.get_onboarding_rule("sanction_hit") or {}
+        if sanction_rule.get("enabled", True) and data.get("sanction_hit", 0):
 
             hard_block = True
 
@@ -21,7 +28,8 @@ class OnboardingControlService:
                 "SANCTION_HIT"
             )
 
-        if data.get("root_status", 0):
+        rooted_rule = self.policy.get_onboarding_rule("rooted_device") or {}
+        if rooted_rule.get("enabled", True) and data.get("root_status", 0):
 
             hard_block = True
 
@@ -56,10 +64,7 @@ class OnboardingControlService:
         # FACE MATCH
         # ----------------------------------------
 
-        if data.get(
-            "face_match_score",
-            1
-        ) < 0.60:
+        if data.get("face_match_score", 1) < float(self.policy.get_onboarding_rule("face_match_min") or 0.60):
 
             reasons.append(
                 "LOW_FACE_MATCH"
@@ -71,11 +76,12 @@ class OnboardingControlService:
         # EDD TRIGGERS
         # ----------------------------------------
 
+        sim_swap_rule = self.policy.get_onboarding_rule("sim_swap") or {}
         if data.get("pep_hit", 0):
 
             requires_edd = True
 
-        if data.get("sim_swap_flag", 0):
+        if sim_swap_rule.get("enabled", True) and data.get("sim_swap_flag", 0):
 
             requires_edd = True
 

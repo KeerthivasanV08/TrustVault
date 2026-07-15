@@ -6,6 +6,8 @@ from pathlib import Path
 from datetime import datetime
 import uuid
 
+from app.core import storage_paths
+
 # ---------------------------------------------------
 # PATH CONFIG
 # ---------------------------------------------------
@@ -23,7 +25,7 @@ PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 
 def generate_onboarding_results():
 
-    print("🚀 Generating Enterprise onboarding_results.csv ...")
+    print("🚀 Generating account_risk_snapshot.csv ...")
 
     # ---------------------------------------------------
     # LOAD DATASETS
@@ -32,7 +34,7 @@ def generate_onboarding_results():
     try:
 
         user_f = pd.read_csv(PROCESSED_DIR / "user_features.csv")
-        graph_f = pd.read_csv(PROCESSED_DIR / "graph_features.csv")
+        graph_f = pd.read_csv(storage_paths.TRAINING_GRAPH_FEATURES_PATH)
         labels = pd.read_csv(PROCESSED_DIR / "labels.csv")
 
         users_raw = pd.read_csv(RAW_DIR / "users.csv")
@@ -385,7 +387,7 @@ def generate_onboarding_results():
     # SAVE OUTPUT
     # ---------------------------------------------------
 
-    output_path = PROCESSED_DIR / "onboarding_results.csv"
+    output_path = storage_paths.ONBOARDING_RISK_SNAPSHOT_PATH
 
     output_df.to_csv(
         output_path,
@@ -396,7 +398,7 @@ def generate_onboarding_results():
     # STATS
     # ---------------------------------------------------
 
-    print("\n✅ onboarding_results.csv generated successfully")
+    print("\n✅ account_risk_snapshot.csv generated successfully")
 
     print("\n📊 Decision Distribution:")
     print(output_df["decision"].value_counts())

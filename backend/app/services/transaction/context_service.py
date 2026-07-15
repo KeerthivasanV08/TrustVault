@@ -2,19 +2,26 @@ from pathlib import Path
 
 import pandas as pd
 
-from app.realtime.transaction_memory_store import LIVE_TRANSACTIONS
+from app.core import storage_paths
+from app.realtime.transaction_memory_store import (
+    RAW_TRANSACTION_SEED_PATH,
+    RECENT_TRANSACTIONS_PATH,
+    get_recent_transactions,
+    get_user_recent_history,
+    initialize_runtime_store,
+)
 
 BASE_DIR = Path(__file__).resolve().parents[4]
 
-TXN_DIR = BASE_DIR / "data" / "processed" 
+TXN_DIR = BASE_DIR / "data" / "processed"
 ONBOARDING_DIR = BASE_DIR / "data" / "processed"
 
 USER_FEATURES_PATH = TXN_DIR / "user_features.csv"
-USER_VELOCITY_PATH = TXN_DIR / "user_velocity.csv"
-ONBOARDING_RESULTS_PATH = ONBOARDING_DIR / "onboarding_results.csv"
-RECENT_TRANSACTIONS_PATH = TXN_DIR / "recent_transactions.csv"
+USER_VELOCITY_PATH = storage_paths.RUNTIME_VELOCITY_STATE_PATH
+ONBOARDING_RESULTS_PATH = storage_paths.ONBOARDING_RISK_SNAPSHOT_PATH
 RECENT_FALLBACK_PATHS = [
-    BASE_DIR / "data" / "raw" / "transactions.csv",
+    RECENT_TRANSACTIONS_PATH,
+    RAW_TRANSACTION_SEED_PATH,
     BASE_DIR / "data" / "processed" / "final_dataset.csv",
 ]
 
@@ -26,6 +33,7 @@ class ContextService:
     _recent_txn_df = None
 
     def __init__(self):
+        initialize_runtime_store()
         if ContextService._user_df is None:
             ContextService._user_df = self._load_indexed(USER_FEATURES_PATH, "user_id")
 
@@ -46,35 +54,26 @@ class ContextService:
             return pd.read_csv(path)
         return pd.DataFrame()
 
-    def _write_recent_transactions_csv(self, df: pd.DataFrame) -> None:
-        if df.empty:
-            return
-
-        RECENT_TRANSACTIONS_PATH.parent.mkdir(parents=True, exist_ok=True)
-        df.to_csv(RECENT_TRANSACTIONS_PATH, index=False)
-
     def _load_recent_transactions(self) -> pd.DataFrame:
-        live_records = list(LIVE_TRANSACTIONS)
-        if live_records:
-            live_df = pd.DataFrame(live_records)
-            self._write_recent_transactions_csv(live_df)
-            return live_df
-
-        if RECENT_TRANSACTIONS_PATH.exists():
-            return pd.read_csv(RECENT_TRANSACTIONS_PATH)
+        frame = pd.DataFrame(get_recent_transactions(limit=500, newest_first=True))
+        if not frame.empty:
+            return frame
 
         for fallback_path in RECENT_FALLBACK_PATHS:
             if fallback_path.exists():
-                fallback_df = pd.read_csv(fallback_path)
-                self._write_recent_transactions_csv(fallback_df)
-                return fallback_df
+                try:
+                    fallback_df = pd.read_csv(fallback_path)
+                    if not fallback_df.empty:
+                        return fallback_df
+                except Exception:
+                    continue
 
         return pd.DataFrame()
 
     def _ensure_recent_transactions(self) -> pd.DataFrame:
-        if LIVE_TRANSACTIONS:
-            recent_df = pd.DataFrame(list(LIVE_TRANSACTIONS))
-            self._write_recent_transactions_csv(recent_df)
+        recent_rows = get_recent_transactions(limit=500, newest_first=True)
+        if recent_rows:
+            recent_df = pd.DataFrame(recent_rows)
             ContextService._recent_txn_df = recent_df
             return recent_df
 
@@ -141,6 +140,10 @@ class ContextService:
         return df.loc[user_id].to_dict()
 
     def get_recent_transactions(self, user_id: str, limit: int = 20) -> list[dict]:
+        rows = get_user_recent_history(user_id, limit=limit)
+        if rows:
+            return rows
+
         df = self._ensure_recent_transactions()
 
         if df.empty:
@@ -158,6 +161,13 @@ class ContextService:
         if receiver_col:
             mask = mask | (df[receiver_col].astype(str) == str(user_id))
 
-        user_txns = df[mask].tail(limit)
+        user_txns = df[mask]
+        if "timestamp" in user_txns.columns:
+            user_txns = user_txns.copy()
+            user_txns["timestamp"] = pd.to_datetime(user_txns["timestamp"], errors="coerce", utc=True)
+            user_txns = user_txns.sort_values(by="timestamp", ascending=True, na_position="last")
 
-        return user_txns.to_dict(orient="records")
+        if "trans_id" in user_txns.columns:
+            user_txns = user_txns.drop_duplicates(subset=["trans_id"], keep="last")
+
+        return user_txns.tail(limit).to_dict(orient="records")

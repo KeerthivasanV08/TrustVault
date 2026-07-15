@@ -1,7 +1,8 @@
 import uuid
 from datetime import datetime
 from typing import List
-from .alert_storage_service import append_row
+from app.core.runtime_context import get_runtime_session_id
+from app.services.cases.case_repository import case_repository
 
 
 def convert_alert_to_case(alert: dict, related_alerts: List[str] = None) -> dict:
@@ -24,17 +25,23 @@ def convert_alert_to_case(alert: dict, related_alerts: List[str] = None) -> dict
     case_id = f"CASE-{uuid.uuid4().hex[:8].upper()}"
     rec = {
         'case_id': case_id,
-        'source_alert': alert.get('alert_id'),
-        'source_alerts': ','.join(related_alerts) if related_alerts else alert.get('alert_id'),
+        'source_alert_id': alert.get('alert_id'),
+        'source_type': alert.get('alert_type') or 'ALERT',
+        'user_id': alert.get('user_id', ''),
+        'transaction_id': alert.get('transaction_id', ''),
         'priority': priority,
         'status': 'OPEN',
-        'assigned_officer': alert.get('assigned_officer'),
+        'assigned_officer': alert.get('assigned_officer_id') or alert.get('assigned_officer'),
+        'assigned_team': alert.get('assigned_queue', ''),
+        'creation_source': 'AUTO_ALERT',
+        'reason': str(alert.get('alert_type') or alert.get('metadata') or {}),
         'evidence': str(alert.get('metadata') or {}),
         'created_at': datetime.utcnow().isoformat(),
-        'closed_at': '',
+        'updated_at': datetime.utcnow().isoformat(),
+        'runtime_session_id': get_runtime_session_id(),
     }
     try:
-        append_row('case_registry', rec)
+        case_repository.upsert_case(rec)
     except Exception:
         pass
     return rec
