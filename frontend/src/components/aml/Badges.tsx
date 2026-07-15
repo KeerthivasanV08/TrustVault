@@ -5,6 +5,8 @@ export function PriorityBadge({ p }: { p: Priority }) {
     ? "bg-critical/15 text-critical border-critical/40 pulse-critical"
     : p === "P2"
     ? "bg-warning/15 text-warning border-warning/40"
+    : p === "INFO"
+    ? "bg-info/10 text-info border-info/30"
     : "bg-muted text-muted-foreground border-border";
   return (
     <span className={`inline-flex items-center px-1.5 h-5 rounded text-[10px] font-bold mono border ${cls}`}>
@@ -32,15 +34,14 @@ export function RiskScoreBadge({ score }: { score: number }) {
 export function StatusBadge({ status }: { status: string }) {
   const t: Record<string, string> = {
     OPEN: "bg-info/10 text-info border-info/30",
-    ACK: "bg-muted text-muted-foreground border-border",
+    UNDER_REVIEW: "bg-info/10 text-info border-info/30",
+    ACKNOWLEDGED: "bg-muted text-muted-foreground border-border",
     ESCALATED: "bg-warning/10 text-warning border-warning/40",
     CLOSED: "bg-success/10 text-success border-success/30",
-    SAR_FILED: "bg-primary/10 text-primary border-primary/40",
-    BLOCKED: "bg-critical/10 text-critical border-critical/40",
-    HELD: "bg-warning/10 text-warning border-warning/40",
-    SETTLED: "bg-success/10 text-success border-success/30",
-    PENDING: "bg-muted text-muted-foreground border-border",
-    IN_REVIEW: "bg-info/10 text-info border-info/30",
+    EDD_REQUESTED: "bg-warning/10 text-warning border-warning/40",
+    ACCOUNT_FROZEN: "bg-critical/10 text-critical border-critical/40",
+    SAR_GENERATED: "bg-primary/10 text-primary border-primary/40",
+    SLA_BREACHED: "bg-critical/10 text-critical border-critical/40",
   };
   return (
     <span className={`inline-flex items-center px-1.5 h-5 rounded text-[10px] mono border ${t[status] ?? t.OPEN}`}>

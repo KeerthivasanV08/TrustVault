@@ -4,10 +4,7 @@ import { review, freeze, sar, escalate, whitelistOfficer } from '@/services/api/
 export function useOfficerActions() {
   const qc = useQueryClient();
   const refresh = () => {
-    qc.invalidateQueries({ queryKey: ['alerts','list'] });
-    qc.invalidateQueries({ queryKey: ['alerts','p1'] });
-    qc.invalidateQueries({ queryKey: ['alerts','queue'] });
-    qc.invalidateQueries({ queryKey: ['cases','list'] });
+    qc.invalidateQueries();
   };
 
   const reviewM = useMutation({ mutationFn: (p: any) => review(p), onSuccess: refresh });

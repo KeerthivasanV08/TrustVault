@@ -1,10 +1,33 @@
 import type { Alert } from '@/types';
 import { extractList } from './util';
 
+function normalizeDate(value: unknown): number {
+  if (value == null || value === '') {
+    return Date.now();
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  const asString = String(value).trim();
+  if (!asString) {
+    return Date.now();
+  }
+
+  const numeric = Number(asString);
+  if (Number.isFinite(numeric)) {
+    return numeric;
+  }
+
+  const parsed = Date.parse(asString);
+  return Number.isNaN(parsed) ? Date.now() : parsed;
+}
+
 export function normalizeAlert(raw: any): Alert {
   const id = String(raw?.id ?? raw?.alert_id ?? raw?.alertId ?? '');
-  const createdAt = Number(raw?.createdAt ?? raw?.created_at ?? raw?.timestamp ?? Date.now());
-  const slaDueAt = Number(raw?.slaDueAt ?? raw?.sla_due_at ?? raw?.deadline_at ?? (createdAt + 2 * 60 * 60_000));
+  const createdAt = normalizeDate(raw?.createdAt ?? raw?.created_at ?? raw?.timestamp);
+  const slaDueAt = normalizeDate(raw?.slaDueAt ?? raw?.sla_due_at ?? raw?.due_at ?? raw?.deadline_at ?? (createdAt + 2 * 60 * 60_000));
   return {
     id,
     alertId: raw?.alert_id ?? raw?.alertId ?? id,
@@ -20,8 +43,12 @@ export function normalizeAlert(raw: any): Alert {
     reasons: extractList<string>(raw?.reasons ?? raw?.reason_list ?? raw?.reason ?? raw?.signals ?? []),
     evidence: extractList<string>(raw?.evidence ?? raw?.evidence_items ?? raw?.evidence_list ?? []),
     queue: raw?.queue ?? raw?.queue_name ?? raw?.assigned_queue,
-    assignedOfficer: raw?.assignedOfficer ?? raw?.assigned_officer ?? null,
+    assignedOfficer: raw?.assignedOfficer ?? raw?.assigned_officer_name ?? raw?.assigned_officer ?? null,
+    assignedOfficerId: raw?.assigned_officer_id ?? raw?.assignedOfficerId ?? null,
+    assignedOfficerName: raw?.assigned_officer_name ?? raw?.assignedOfficerName ?? raw?.assigned_officer ?? null,
     slaDueAt,
+    remainingSeconds: raw?.remainingSeconds ?? raw?.remaining_seconds ?? undefined,
+    slaBreached: raw?.slaBreached ?? raw?.sla_breached ?? undefined,
     createdAt,
     status: String(raw?.status ?? raw?.state ?? 'OPEN').toUpperCase() as Alert['status'],
     caseId: raw?.caseId ?? raw?.case_id ?? null,
