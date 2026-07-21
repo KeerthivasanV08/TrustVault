@@ -8,8 +8,10 @@ import { SLATimer } from "@/components/aml/SLATimer";
 import type { Alert } from '@/types';
 import { ExplainabilityPanel } from "@/components/aml/ExplainabilityPanel";
 import { useAlerts } from '@/hooks/useAlerts';
-import { createCase, freezeCase, sarCase } from '@/services/api/cases';
-import { ArrowUpRight, CheckCircle2, FileSignature, Snowflake, UserCheck, X } from "lucide-react";
+import { createCase } from '@/services/api/cases';
+import { freeze as freezeAccount, sar as generateSar } from '@/services/api/officer';
+import { API_BASE } from '@/services/api/client';
+import { ArrowUpRight, CheckCircle2, FileSignature, Loader2, Snowflake, UserCheck, X } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/alerts")({
@@ -26,15 +28,32 @@ function AlertsPage() {
     if (alertsQ.data && !alertsQ.isFetching) mergeHistoricalAlerts(alertsQ.data || []);
   }, [alertsQ.data, alertsQ.isFetching]);
 
-  const [queue, setQueue] = useState<"ALL" | "P1_QUEUE" | "ESCALATED" | "EDD" | "GENERAL">("ALL");
+  const [queue, setQueue] = useState<"ALL" | "AML_CRITICAL_QUEUE" | "AML_REVIEW_QUEUE" | "AML_MONITORING_QUEUE" | "AML_INFO_QUEUE">("ALL");
   const [selected, setSelected] = useState<Alert | null>(null);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
 
   const refreshQueues = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['alerts', 'list'] }),
-      queryClient.invalidateQueries({ queryKey: ['alerts', 'p1'] }),
-      queryClient.invalidateQueries({ queryKey: ['cases', 'list'] }),
-    ]);
+    await queryClient.invalidateQueries();
+  };
+
+  const withBusy = async (key: string, task: () => Promise<void>) => {
+    setBusyAction(key);
+    try {
+      await task();
+    } finally {
+      setBusyAction((current) => (current === key ? null : current));
+    }
+  };
+
+  const triggerDownload = (downloadUrl: string) => {
+    const absolute = new URL(downloadUrl, API_BASE).toString();
+    const link = document.createElement('a');
+    link.href = absolute;
+    link.rel = 'noreferrer';
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   };
 
   const ensureCaseForAlert = async (alert: Alert) => {
@@ -48,73 +67,118 @@ function AlertsPage() {
       priority: alert.priority,
       status: 'OPEN',
       source_alert: alert.id,
+      source_alert_id: alert.id,
       source_alerts: [alert.id],
       evidence: alert.signals ?? [],
       created_at: new Date(alert.createdAt ?? Date.now()).toISOString(),
     });
 
-    return created.caseId ?? created.id;
+    return created.caseId ?? created.id ?? created.case_id ?? '';
   };
 
   const handleAcknowledge = async (alertId: string) => {
-    try {
-      await alertsQ.acknowledge(alertId);
-      await refreshQueues();
-      toast.success(`Acknowledged ${alertId}`);
-    } catch (error) {
-      toast.error(`Failed to acknowledge ${alertId}`);
-    }
+    await withBusy(`ack:${alertId}`, async () => {
+      try {
+        await alertsQ.acknowledge(alertId);
+        await refreshQueues();
+        toast.success(`Acknowledged ${alertId}`);
+      } catch (error) {
+        toast.error(`Failed to acknowledge ${alertId}`);
+      }
+    });
   };
 
   const handleEscalate = async (alertId: string) => {
-    try {
-      await alertsQ.escalate(alertId);
-      await refreshQueues();
-      toast.success(`Escalated ${alertId}`);
-    } catch (error) {
-      toast.error(`Failed to escalate ${alertId}`);
-    }
+    await withBusy(`esc:${alertId}`, async () => {
+      try {
+        await alertsQ.escalate(alertId);
+        await refreshQueues();
+        toast.success(`Escalated ${alertId}`);
+      } catch (error) {
+        toast.error(`Failed to escalate ${alertId}`);
+      }
+    });
   };
 
   const handleFreeze = async (alert: Alert) => {
-    try {
-      const caseId = await ensureCaseForAlert(alert);
-      await freezeCase(caseId);
-      await refreshQueues();
-      toast.success(`Freeze requested for case ${caseId}`);
-    } catch (error) {
-      toast.error(`Failed to freeze alert ${alert.id}`);
-    }
+    await withBusy(`freeze:${alert.id}`, async () => {
+      try {
+        const caseId = await ensureCaseForAlert(alert);
+        await freezeAccount({
+          user_id: alert.userId,
+          case_id: caseId,
+          officer_id: 'OFFICER_1',
+          freeze_type: 'DEBIT_FREEZE',
+          reason: alert.summary ?? `Freeze requested for alert ${alert.id}`,
+        });
+        await refreshQueues();
+        toast.success(`Freeze requested for ${alert.userId}`);
+      } catch (error) {
+        toast.error(`Failed to freeze alert ${alert.id}`);
+      }
+    });
   };
 
   const handleSar = async (alert: Alert) => {
-    try {
-      const caseId = await ensureCaseForAlert(alert);
-      await sarCase(caseId);
-      await refreshQueues();
-      toast.success(`SAR requested for case ${caseId}`);
-    } catch (error) {
-      toast.error(`Failed to create SAR for alert ${alert.id}`);
-    }
+    await withBusy(`sar:${alert.id}`, async () => {
+      try {
+        const caseId = await ensureCaseForAlert(alert);
+        let result: any;
+
+        try {
+          result = await generateSar({
+            case_id: caseId,
+            officer_id: 'OFFICER_1',
+            notes: alert.summary ?? `SAR requested from alert ${alert.id}`,
+            filing_type: 'INTERNAL',
+          }, 60000);
+        } catch (firstError) {
+          try {
+            result = await generateSar({
+              alert_id: alert.id,
+              officer_id: 'OFFICER_1',
+              notes: alert.summary ?? `SAR requested from alert ${alert.id}`,
+              filing_type: 'INTERNAL',
+            }, 60000);
+          } catch (fallbackError) {
+            console.error('SAR generation failed for alert', alert.id, { firstError, fallbackError });
+            throw fallbackError;
+          }
+        }
+
+        const downloadUrl = (result as any)?.download_url;
+        if (downloadUrl) {
+          triggerDownload(downloadUrl);
+        }
+        toast.success(`SAR generated for alert ${alert.id}`);
+        refreshQueues().catch(() => undefined);
+      } catch (error) {
+        console.error('Failed to create SAR for alert', alert.id, error);
+        const message = error instanceof Error ? error.message : String(error ?? 'Unknown error');
+        toast.error(`Failed to create SAR for alert ${alert.id}: ${message}`);
+      }
+    });
   };
 
   const handleClose = async (alertId: string) => {
-    try {
-      await alertsQ.close(alertId);
-      await refreshQueues();
-      toast.success(`Closed ${alertId}`);
-    } catch (error) {
-      toast.error(`Failed to close ${alertId}`);
-    }
+    await withBusy(`close:${alertId}`, async () => {
+      try {
+        await alertsQ.close(alertId);
+        await refreshQueues();
+        toast.success(`Closed ${alertId}`);
+      } catch (error) {
+        toast.error(`Failed to close ${alertId}`);
+      }
+    });
   };
 
   const filtered = alerts.filter((a) => queue === "ALL" || a.queue === queue);
   const counts = {
     ALL: alerts.length,
-    P1_QUEUE: alerts.filter((a) => a.queue === "P1_QUEUE").length,
-    ESCALATED: alerts.filter((a) => a.queue === "ESCALATED").length,
-    EDD: alerts.filter((a) => a.queue === "EDD").length,
-    GENERAL: alerts.filter((a) => a.queue === "GENERAL").length,
+    AML_CRITICAL_QUEUE: alerts.filter((a) => a.queue === "AML_CRITICAL_QUEUE").length,
+    AML_REVIEW_QUEUE: alerts.filter((a) => a.queue === "AML_REVIEW_QUEUE").length,
+    AML_MONITORING_QUEUE: alerts.filter((a) => a.queue === "AML_MONITORING_QUEUE").length,
+    AML_INFO_QUEUE: alerts.filter((a) => a.queue === "AML_INFO_QUEUE").length,
   };
 
   return (
@@ -133,9 +197,9 @@ function AlertsPage() {
       )}
 
       <div className="flex items-center gap-1.5 text-[11px]">
-        {(["ALL", "P1_QUEUE", "ESCALATED", "EDD", "GENERAL"] as const).map((q) => (
+        {(["ALL", "AML_CRITICAL_QUEUE", "AML_REVIEW_QUEUE", "AML_MONITORING_QUEUE", "AML_INFO_QUEUE"] as const).map((q) => (
           <button key={q} onClick={() => setQueue(q)} className={`h-8 px-3 rounded-md mono border ${queue === q ? "bg-primary text-primary-foreground border-primary" : "border-border bg-card/60 hover:bg-card"}`}>
-            {q.replace("_", " ")} <span className="opacity-60 ml-1">{counts[q]}</span>
+            {q === "ALL" ? q : q.split("_").join(" ")} <span className="opacity-60 ml-1">{counts[q]}</span>
           </button>
         ))}
       </div>
@@ -166,15 +230,15 @@ function AlertsPage() {
                   <td className="mono text-[10px] text-muted-foreground">{a.queue.replace("_", " ")}</td>
                   <td className="text-[11px]">{a.assignedOfficer ?? <span className="text-muted-foreground italic">unassigned</span>}</td>
                   <td><SLATimer dueAt={a.slaDueAt} /></td>
-                  <td className="mono text-[10px] text-muted-foreground">{a.createdAt ? new Date(a.createdAt).toLocaleTimeString() : "—"}</td>
+                  <td className="mono text-[10px] text-muted-foreground">{a.createdAt ? new Date(a.createdAt).toLocaleString(undefined, { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : "—"}</td>
                   <td><StatusBadge status={a.status} /></td>
                   <td onClick={(e) => e.stopPropagation()}>
                     <div className="flex gap-1">
-                      <ActionIcon icon={UserCheck} label="Acknowledge" onClick={() => handleAcknowledge(a.id)} />
-                      <ActionIcon icon={ArrowUpRight} label="Escalate" onClick={() => handleEscalate(a.id)} tone="warning" />
-                      <ActionIcon icon={Snowflake} label="Freeze account" onClick={() => handleFreeze(a)} tone="critical" />
-                      <ActionIcon icon={FileSignature} label="Create SAR" onClick={() => handleSar(a)} tone="primary" />
-                      <ActionIcon icon={CheckCircle2} label="Close" onClick={() => handleClose(a.id)} tone="success" />
+                      <ActionIcon icon={UserCheck} label="Acknowledge" onClick={() => handleAcknowledge(a.id)} loading={busyAction === `ack:${a.id}`} disabled={busyAction !== null && busyAction !== `ack:${a.id}`} />
+                      <ActionIcon icon={ArrowUpRight} label="Escalate" onClick={() => handleEscalate(a.id)} tone="warning" loading={busyAction === `esc:${a.id}`} disabled={busyAction !== null && busyAction !== `esc:${a.id}`} />
+                      <ActionIcon icon={Snowflake} label="Freeze account" onClick={() => handleFreeze(a)} tone="critical" loading={busyAction === `freeze:${a.id}`} disabled={busyAction !== null && busyAction !== `freeze:${a.id}`} />
+                      <ActionIcon icon={FileSignature} label="Create SAR" onClick={() => handleSar(a)} tone="primary" loading={busyAction === `sar:${a.id}`} disabled={busyAction !== null && busyAction !== `sar:${a.id}`} />
+                      <ActionIcon icon={CheckCircle2} label="Close" onClick={() => handleClose(a.id)} tone="success" loading={busyAction === `close:${a.id}`} disabled={busyAction !== null && busyAction !== `close:${a.id}`} />
                     </div>
                   </td>
                 </tr>
@@ -190,7 +254,7 @@ function AlertsPage() {
   );
 }
 
-function ActionIcon({ icon: Icon, label, onClick, tone = "default" }: { icon: any; label: string; onClick: () => void; tone?: "default" | "warning" | "critical" | "primary" | "success" }) {
+function ActionIcon({ icon: Icon, label, onClick, tone = "default", disabled = false, loading = false }: { icon: any; label: string; onClick: () => void; tone?: "default" | "warning" | "critical" | "primary" | "success"; disabled?: boolean; loading?: boolean }) {
   const t = {
     default: "text-muted-foreground hover:text-foreground hover:bg-accent",
     warning: "text-warning hover:bg-warning/10",
@@ -199,8 +263,8 @@ function ActionIcon({ icon: Icon, label, onClick, tone = "default" }: { icon: an
     success: "text-success hover:bg-success/10",
   }[tone];
   return (
-    <button onClick={onClick} title={label} className={`h-6 w-6 rounded border border-border flex items-center justify-center ${t}`}>
-      <Icon className="h-3 w-3" />
+    <button onClick={onClick} title={label} disabled={disabled || loading} className={`h-6 w-6 rounded border border-border flex items-center justify-center transition ${t} ${(disabled || loading) ? 'opacity-50 cursor-not-allowed' : ''}`}>
+      {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Icon className="h-3 w-3" />}
     </button>
   );
 }

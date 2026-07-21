@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from app.core.policy_engine import POLICY_RULES
+from app.core.policy_engine import get_policy_engine
 from app.core import storage_paths
 
 from app.services.transaction.audit_service import (
@@ -20,6 +20,8 @@ from app.services.transaction.whitelist_service import (
 )
 
 PROCESSED_DIR = storage_paths.PROCESSED_DIR
+RUNTIME_DIR = storage_paths.RUNTIME_DIR
+POLICY = get_policy_engine()
 
 
 def _load_indexed_csv(path, index_col):
@@ -46,7 +48,7 @@ class RegulatoryControlEngine:
         )
 
         self.velocity = _load_indexed_csv(
-            PROCESSED_DIR / "user_velocity.csv",
+            RUNTIME_DIR / "user_velocity_state.csv",
             "user_id",
         )
 
@@ -72,6 +74,26 @@ class RegulatoryControlEngine:
                 "decision": "PASS",
                 "reason": "WHITELISTED_USER"
             }
+
+        # ---------------------------------------------------
+        # ACCOUNT FREEZE CHECK
+        # ---------------------------------------------------
+
+        try:
+            from app.services.officer.account_operations_service import account_operations_service
+            if account_operations_service.is_account_frozen(sender_id):
+                log_control_decision(
+                    sender_id,
+                    "transaction",
+                    "BLOCK",
+                    "ACCOUNT_FROZEN"
+                )
+                return {
+                    "decision": "BLOCK",
+                    "reason": "ACCOUNT_FROZEN"
+                }
+        except Exception:
+            pass
 
         # ---------------------------------------------------
         # USER LOOKUP
@@ -123,7 +145,7 @@ class RegulatoryControlEngine:
         if (
             account_age_hours < 24 and
             amount >
-            POLICY_RULES["NEW_USER_UPI_LIMIT"]
+            POLICY.get_transaction_rule("new_user_upi_limit", 5000)
         ):
 
             log_control_decision(
@@ -142,7 +164,7 @@ class RegulatoryControlEngine:
 
         if (
             velocity["rolling_24h_sum"] + amount >
-            POLICY_RULES["DAILY_UPI_LIMIT"]
+            POLICY.get_transaction_rule("upi_daily_limit", 100000)
         ):
 
             log_control_decision(
@@ -161,7 +183,7 @@ class RegulatoryControlEngine:
 
         if (
             amount >=
-            POLICY_RULES["PAN_MANDATORY_LIMIT"]
+            POLICY.get_transaction_rule("pan_cash_threshold", 50000)
             and
             user["kyc_status"] != "verified"
         ):
@@ -191,7 +213,7 @@ class RegulatoryControlEngine:
                 "device_shared_count",
                 0
             ) >=
-            POLICY_RULES["MULE_HUB_THRESHOLD"]
+            POLICY.get_transaction_rule("mule_hub_threshold", 3)
         ):
 
             edd_flags.append(
@@ -205,7 +227,7 @@ class RegulatoryControlEngine:
                 "days_since_last_txn",
                 0
             ) >
-            POLICY_RULES["DORMANCY_DAYS"]
+            POLICY.get_transaction_rule("dormancy_days", 180)
             and amount > 10000
         ):
 
@@ -221,7 +243,7 @@ class RegulatoryControlEngine:
                 0
             ) == 1
             and amount >
-            POLICY_RULES["GEO_LIMIT"]
+            POLICY.get_transaction_rule("geo_limit", 25000)
         ):
 
             edd_flags.append(
@@ -255,7 +277,7 @@ class RegulatoryControlEngine:
                 "fy_aggregate_credits",
                 0
             ) + amount >
-            POLICY_RULES["SAVINGS_SFT_LIMIT"]
+            POLICY.get_transaction_rule("savings_sft_limit", 1000000)
         ):
 
             generate_report(
@@ -265,7 +287,7 @@ class RegulatoryControlEngine:
                 amount
             )
 
-        if amount > POLICY_RULES["CTR_LIMIT"]:
+        if amount > POLICY.get_transaction_rule("ctr_limit", 1000000):
 
             generate_report(
                 sender_id,

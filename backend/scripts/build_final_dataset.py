@@ -4,6 +4,8 @@ import pandas as pd
 
 from pathlib import Path
 
+from app.core import storage_paths
+
 
 # =====================================================
 # PATH CONFIG
@@ -40,17 +42,11 @@ def build_final_dataset():
         PROCESSED_DIR / "user_features.csv"
     )
 
-    graph_features = pd.read_csv(
-        PROCESSED_DIR / "graph_features.csv"
-    )
+    graph_features = pd.read_csv(storage_paths.TRAINING_GRAPH_FEATURES_PATH)
 
-    velocity_features = pd.read_csv(
-        PROCESSED_DIR / "user_velocity.csv"
-    )
+    velocity_features = pd.read_csv(storage_paths.TRAINING_VELOCITY_PATH)
 
-    onboarding_results = pd.read_csv(
-        PROCESSED_DIR / "onboarding_results.csv"
-    )
+    onboarding_results = pd.read_csv(storage_paths.ONBOARDING_RISK_SNAPSHOT_PATH)
 
     labels = pd.read_csv(
         PROCESSED_DIR / "labels.csv"

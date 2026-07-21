@@ -6,6 +6,8 @@ from pathlib import Path
 from neo4j import GraphDatabase
 from dotenv import load_dotenv, find_dotenv
 
+from app.core import storage_paths
+
 
 # =====================================================
 # PATHS
@@ -88,9 +90,7 @@ tx_df = pd.read_csv(
     RAW_DIR / "transactions.csv"
 )
 
-onboarding_df = pd.read_csv(
-    PROCESSED_DIR / "onboarding_results.csv"
-)
+onboarding_df = pd.read_csv(storage_paths.ONBOARDING_RISK_SNAPSHOT_PATH)
 
 
 # =====================================================

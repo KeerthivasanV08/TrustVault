@@ -1,7 +1,7 @@
 // Centralized TypeScript models for API responses
-export type Priority = "P1" | "P2" | "P3";
+export type Priority = "P1" | "P2" | "P3" | "INFO";
 export type Decision = "ALLOW" | "REVIEW" | "BLOCK";
-export type AlertStatus = "OPEN" | "ACK" | "ESCALATED" | "CLOSED" | "SAR_FILED";
+export type AlertStatus = "OPEN" | "UNDER_REVIEW" | "ACKNOWLEDGED" | "ESCALATED" | "EDD_REQUESTED" | "ACCOUNT_FROZEN" | "SAR_GENERATED" | "CLOSED" | "SLA_BREACHED";
 export type SLAStatus = "OPEN" | "BREACHED" | "ESCALATED" | "RESOLVED";
 
 export interface ModelContribution {
@@ -47,7 +47,11 @@ export interface Alert {
   riskScore: number;
   queue?: string;
   assignedOfficer?: string | null;
+  assignedOfficerId?: string | null;
+  assignedOfficerName?: string | null;
   slaDueAt?: number;
+  remainingSeconds?: number;
+  slaBreached?: boolean;
   createdAt?: number;
   status?: AlertStatus;
   caseId?: string | null;

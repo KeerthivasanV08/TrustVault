@@ -1,6 +1,7 @@
-# backend/scripts/user_velocity.py
 import pandas as pd
 from pathlib import Path
+
+from app.core import storage_paths
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 RAW_DIR = BASE_DIR / "data" / "raw"
@@ -49,8 +50,8 @@ def build_user_velocity():
     # Add a derived feature: Days since last activity
     velocity["days_since_last_tx"] = (current_time - velocity["last_tx_timestamp"]).dt.days
 
-    velocity.to_csv(PROCESSED_DIR / "user_velocity.csv", index=False)
-    print(f"✅ user_velocity.csv created. Reference Time: {current_time}")
+    velocity.to_csv(storage_paths.TRAINING_VELOCITY_PATH, index=False)
+    print(f"✅ training/user_velocity.csv created. Reference Time: {current_time}")
 
 if __name__ == "__main__":
     build_user_velocity()

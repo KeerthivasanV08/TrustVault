@@ -148,7 +148,7 @@ def prepare_onboarding_training_data():
     df_results = pd.read_csv(
         DATA_DIR
         / "processed"
-        / "onboarding_results.csv"
+        / "onboarding" / "account_risk_snapshot.csv"
     )
 
     df_labels = pd.read_csv(

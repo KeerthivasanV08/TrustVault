@@ -10,12 +10,7 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parents[4]
 
-ONBOARDING_PATH = (
-    BASE_DIR /
-    "data" /
-    "processed" /
-    "onboarding_results.csv"
-)
+ONBOARDING_PATH = BASE_DIR / "data" / "processed" / "onboarding" / "account_risk_snapshot.csv"
 
 
 # ---------------------------------------------------
@@ -42,7 +37,7 @@ class OnboardingReputationService:
 
         except Exception as e:
 
-            print(f"❌ Failed loading onboarding_results.csv: {e}")
+            print(f"❌ Failed loading account_risk_snapshot.csv: {e}")
 
             self.df = pd.DataFrame()
 

@@ -10,10 +10,7 @@ export function useAlerts() {
   const escalations = useQuery<unknown[]>({ queryKey: ['alerts','escalations'], queryFn: fetchAlertEscalations, staleTime: 30_000, retry: 2, refetchInterval: 60_000 });
 
   const refresh = () => {
-    qc.invalidateQueries({ queryKey: ['alerts','list'] });
-    qc.invalidateQueries({ queryKey: ['alerts','p1'] });
-    qc.invalidateQueries({ queryKey: ['alerts','queue'] });
-    qc.invalidateQueries({ queryKey: ['cases','list'] });
+    qc.invalidateQueries();
   };
 
   const ack = useMutation({ mutationFn: (id: string) => acknowledgeAlert(id), onSuccess: refresh });

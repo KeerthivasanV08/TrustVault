@@ -3,6 +3,8 @@
 import pandas as pd
 from pathlib import Path
 
+from app.core import storage_paths
+
 
 # ---------------------------------------------------
 # PATH CONFIG
@@ -118,7 +120,7 @@ def init():
         "created_at"
 
     ]).to_csv(
-        PROCESSED_DIR / "onboarding_results.csv",
+        storage_paths.ONBOARDING_RISK_SNAPSHOT_PATH,
         index=False
     )
 

@@ -4,15 +4,18 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import FileResponse
 
 from app.db.file_storage import log_report
 from app.services.shared.reporting_service import reporting_service
 from app.core import storage_paths
+from app.services.officer.sar_generation_service import sar_generation_service
 
 router = APIRouter()
 
 REPORTS_FILE = storage_paths.REPORTS_DIR / "reports.csv"
+SAR_REPORTS_DIR = storage_paths.PROCESSED_DIR / "reports" / "sar"
 
 
 def _list_reports(
@@ -192,3 +195,41 @@ def export_reports(format: str = Query(default="json")):
     if fmt == "pdf":
         return json.dumps({"format": "pdf", "rows": df.to_dict(orient="records")}, ensure_ascii=False)
     return df.to_json(orient="records")
+
+
+@router.get("/v1/sar/{identifier}/download")
+def download_sar(identifier: str):
+    try:
+        reports = sar_generation_service.get_sar_reports()
+    except Exception:
+        reports = []
+
+    report = next(
+        (
+            item for item in reversed(reports)
+            if str(item.get("case_id", "")) == str(identifier)
+            or str(item.get("alert_id", "")) == str(identifier)
+            or str(item.get("sar_id", "")) == str(identifier)
+        ),
+        None,
+    )
+
+    if not report:
+        raise HTTPException(status_code=404, detail="SAR not found")
+
+    pdf_path_value = str(report.get("pdf_path") or "").strip()
+    pdf_filename = str(report.get("pdf_filename") or "").strip()
+    pdf_path = Path(pdf_path_value) if pdf_path_value else (SAR_REPORTS_DIR / pdf_filename if pdf_filename else None)
+
+    if pdf_path is None:
+        raise HTTPException(status_code=404, detail="SAR PDF not found")
+
+    if not pdf_path.exists() and pdf_filename:
+        alternate_path = SAR_REPORTS_DIR / pdf_filename
+        if alternate_path.exists():
+            pdf_path = alternate_path
+
+    if not pdf_path.exists():
+        raise HTTPException(status_code=404, detail="SAR PDF file missing")
+
+    return FileResponse(path=str(pdf_path), media_type="application/pdf", filename=pdf_filename)

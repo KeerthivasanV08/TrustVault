@@ -31,7 +31,7 @@ export function SLATimer({ dueAt }: { dueAt?: number }) {
           : "bg-muted/40 text-muted-foreground border-border"
       }`}
     >
-      {breached ? `+${fmt}` : fmt}
+      {breached ? "SLA BREACHED" : fmt}
     </span>
   );
 }
